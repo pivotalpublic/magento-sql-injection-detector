@@ -6,7 +6,7 @@ Tait Pollack
 
 Checks Magento database for changes to content rendered to user. If different alert the admin!
 
-Tables to check: cms_page, cms_block, core_config_data
+Tables to check: cms_page, cms_block, core_config_data, admin_user
 
 */
 
@@ -52,11 +52,13 @@ if (!$con) {
     $cms_page = getHashofTable($con, "cms_page", $salt);
     $cms_block = getHashofTable($con, "cms_block", $salt);
     $core_config_data = getHashofTable($con, "core_config_data", $salt);
+    $admin_user = getHashofTable($con, "admin_user", $salt);
     
     $results = [];
     $results["cms_page"] = $cms_page;
     $results["cms_block"] = $cms_block;
     $results["core_config_data"] = $core_config_data;
+    $results["admin_user"] = $core_config_data;
     $json_string = json_encode($results);
     file_put_contents($hashes_file, $json_string);
 
