@@ -1,0 +1,10 @@
+<?php
+
+    //Ensure the permissions on this file are correct
+    $client_name = "CLIENT NAME";
+    $chat_id = ""; //XXXXXXXXX
+    $telegram_token = ""; //XXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    $salt = "[pi>otal]"; //Anything you want, but something to prevent a reverse engineering
+    $mage_directory = __DIR__ . "/../htdocs"; ///../htdocs (In relation to detector.php)
+
+?>
