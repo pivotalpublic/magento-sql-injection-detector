@@ -12,6 +12,9 @@ Tables to check: cms_page, cms_block, core_config_data, admin_user
 
 include 'config.php';
 
+//Often found after sqlinjection
+$alert_on = Array("getscript", "ajax.request", ".js");
+
 $hashes_file = __DIR__ . "/detector.json";
 $magento_vars = fetchArray($mage_directory . "/app/etc/env.php");
 
@@ -49,18 +52,18 @@ if (!$con) {
         print "Nothing to compare yet...\n";
     }
 
-    $cms_page = getHashofTable($con, "cms_page", $salt);
-    $cms_block = getHashofTable($con, "cms_block", $salt);
-    $core_config_data = getHashofTable($con, "core_config_data", $salt);
+    $cms_page = getHashofTable($con, "cms_page", $salt, $alert_on);
+    $cms_block = getHashofTable($con, "cms_block", $salt, $alert_on);
+    $core_config_data = getHashofTable($con, "core_config_data", $salt, $alert_on);
     $admin_user = getHashofTable($con, "admin_user", $salt);
     
     $results = [];
     $results["cms_page"] = $cms_page;
     $results["cms_block"] = $cms_block;
     $results["core_config_data"] = $core_config_data;
-    $results["admin_user"] = $core_config_data;
+    $results["admin_user"] = $admin_user;
     $json_string = json_encode($results);
-    file_put_contents($hashes_file, $json_string);
+    //file_put_contents($hashes_file, $json_string);
 
     // print "json_string Output:\n";
     // print_r($results);
@@ -76,29 +79,60 @@ if (!$con) {
     $difference = arrayRecursiveDiff($results, $previous_json);
 
     $count_differences = count($difference);
+
     print "There are $count_differences different tables...\n";
+    print "\n";
 
     if ($count_differences > 0) {
-        print "Different is...\n";
+        //print "Different is...\n";
+        $plain_text_message = plainTextDifferences($difference);
         $the_differences = var_export($difference, true);
-        print $the_differences;
+        //print $the_differences;
     }
 
     if ($count_differences > 0) {
         // $the_keys = array_keys($difference);
         // $keys_string = implode(",", $the_keys);
-        $message = "Table Change Alert on $client_name website\n";
-        $message .= "==========================================\n";
-        $message .= $the_differences . "\n";
-        print $message;
+        $message = "$client_name Table Change\n";
+        $message .= "========================\n";
+        $message .= $plain_text_message . "\n";
+        print "\n";
+        print "Plain Text...\n";
+        print plainTextDifferences($difference);
+        print "\n";
+        print "Array Structure...\n";
+        print $the_differences;
+        print "\n";
+        print "\n";
+        //print $message;
         sendMessage($chat_id, $message, $telegram_token);
+        print "\n";
+        //Update new hashes after sending message. Comment out while debugging to keep getting same results.
+        file_put_contents($hashes_file, $json_string);
     } else {
-        print "No change, don't worry...\n";
+        print "No change since last check...\n";
         print "\n";
         //sendMessage($chat_id, "Nothing changed on the " . $client_name . " website...", $telegram_token);
     }
 
     $con->close();
+}
+
+function plainTextDifferences($arr) {
+    $plain_text = "";
+    foreach ($arr as $table_name => $table_contents) {
+        $plain_text .= "Table " . $table_name . "\n";
+        foreach ($table_contents as $table_content) {
+            $row_data = explode(":", $table_content[0]);
+            $plain_text .= "ID: " . $row_data[0];
+            if ($found = $row_data[2]) {
+                $plain_text .= " found " . $found . "!\n";
+            } else {
+                $plain_text .= "\n";
+            }
+        }
+    }
+    return $plain_text;
 }
 
 function arrayRecursiveDiff($aArray1, $aArray2) {
@@ -136,7 +170,7 @@ function fetchArray($in)
   }
 }
 
-function getHashofTable($con, $table, $salt) {
+function getHashofTable($con, $table, $salt, $alert_on=null) {
 
     $query = "SELECT * FROM " . $table . ";";
     $result = $con->query($query);
@@ -150,11 +184,36 @@ function getHashofTable($con, $table, $salt) {
 
         //Get unique hash for each row
         array_shift($columns);
-        $stringMash[$the_count][0] = $stringMash[$the_count][0] . ":" . hash( 'sha1', implode($salt, $columns));
+        $imploded_columns = implode($salt, $columns);
+
+        //Check for things to alert on
+        $alert_string = "";
+        $found_alert_arr = [];
+        if ($alert_on) {
+            foreach ($alert_on as $alert) {
+                if (strpos(strtolower($imploded_columns), strtolower($alert)) !== false) {
+                    $found_alert_arr[] = $alert;
+                    print "Found $alert in $table: " . $stringMash[$the_count][0] . "\n";
+                    print "\n";
+                }
+            }
+            if (count($found_alert_arr) > 0) {
+                $alert_string = ":" . implode(",", $found_alert_arr);
+            }
+        }
+
+        $stringMash[$the_count][0] = $stringMash[$the_count][0] . ":" . hash( 'sha1', $imploded_columns) . $alert_string;
+        
+        //debug only
+        //print $table . " row: " . $stringMash[$the_count][0] . ":" . implode("<|split|>", $columns) . "\n";
 
         $the_count++;
 
     }
+
+    //prettier when debugging
+    // print "\n";
+    // print "\n";
 
     // print_r($stringMash);
     return $stringMash;
