@@ -105,14 +105,19 @@ if (!$con) {
         print "\n";
         print "\n";
         //print $message;
-        sendMessage($chat_id, $message, $telegram_token);
-        print "\n";
+
+        //$chat_id_arr = explode(",", $chat_id);
+        //foreach($chat_id_arr as $chat_id) {
+            sendMessage($chat_ids, $message, $telegram_token);
+            print "\n";
+        //}
+
         //Update new hashes after sending message. Comment out while debugging to keep getting same results.
         file_put_contents($hashes_file, $json_string);
     } else {
         print "No change since last check...\n";
         print "\n";
-        //sendMessage($chat_id, "Nothing changed on the " . $client_name . " website...", $telegram_token);
+        //sendMessage($chat_ids, "Nothing changed on the " . $client_name . " website...", $telegram_token);
     }
 
     $con->close();
@@ -220,18 +225,25 @@ function getHashofTable($con, $table, $salt, $alert_on=null) {
 
 }
 
-function sendMessage($chatID, $messaggio, $token) {
-    print "sending message to " . $chatID . "\n";
+function sendMessage($chatIDs, $messaggio, $token) {
 
-    $url = "https://api.telegram.org/bot" . $token . "/sendMessage?chat_id=" . $chatID;
-    $url = $url . "&text=" . urlencode($messaggio);
-    $ch = curl_init();
-    $optArray = array(
+    $chat_id_arr = explode(",", $chatIDs);
+    foreach ($chat_id_arr as $chatID) {
+
+        print "sending message to " . $chatID . "\n";
+        print "\n";
+
+        $url = "https://api.telegram.org/bot" . $token . "/sendMessage?chat_id=" . $chatID;
+        $url = $url . "&text=" . urlencode($messaggio);
+        $ch = curl_init();
+        $optArray = array(
             CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true
-    );
-    curl_setopt_array($ch, $optArray);
-    $result = curl_exec($ch);
-    curl_close($ch);
-    return $result;
+        );
+        curl_setopt_array($ch, $optArray);
+        $result = curl_exec($ch);
+        curl_close($ch);
+    }
+
+    //return $result;
 }
