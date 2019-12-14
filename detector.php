@@ -55,7 +55,7 @@ if (!$con) {
     $cms_page = getHashofTable($con, "cms_page", $salt, $alert_on);
     $cms_block = getHashofTable($con, "cms_block", $salt, $alert_on);
     $core_config_data = getHashofTable($con, "core_config_data", $salt, $alert_on);
-    $admin_user = getHashofTable($con, "admin_user", $salt);
+    $admin_user = getHashofTable($con, "admin_user", $salt, null, 4); //4 = username
     
     $results = [];
     $results["cms_page"] = $cms_page;
@@ -130,12 +130,16 @@ function plainTextDifferences($arr) {
         foreach ($table_contents as $table_content) {
             $row_data = explode(":", $table_content[0]);
             $plain_text .= "ID: " . $row_data[0];
-            if ($found = $row_data[2]) {
-                $plain_text .= " found " . $found . "!\n";
-            } else {
-                $plain_text .= "\n";
-            }
+            //if ($found = $row_data[2]) {
+                if ($field_checked = $row_data[3]) {
+                    $field_string = " - " . $field_checked;
+                }
+                $plain_text .= " detected " . $row_data[2] . $field_string . "\n";
+            //} else {
+                //$plain_text .= "\n";
+            //}
         }
+        $plain_text .= "\n";
     }
     return $plain_text;
 }
@@ -175,7 +179,7 @@ function fetchArray($in)
   }
 }
 
-function getHashofTable($con, $table, $salt, $alert_on=null) {
+function getHashofTable($con, $table, $salt, $alert_on = null, $extract_field = null) {
 
     $query = "SELECT * FROM " . $table . ";";
     $result = $con->query($query);
@@ -186,13 +190,19 @@ function getHashofTable($con, $table, $salt, $alert_on=null) {
 
         //Get row ID (always first)
         $stringMash[$the_count][0] = $columns[0];
+        
+        //Get extracted field if requested
+        $extracted_field = "";
+        if ($extract_field) {
+            $extracted_field = ":" . $columns[$extract_field];
+        }
 
         //Get unique hash for each row
         array_shift($columns);
         $imploded_columns = implode($salt, $columns);
 
         //Check for things to alert on
-        $alert_string = "";
+        $alert_string = ":change";
         $found_alert_arr = [];
         if ($alert_on) {
             foreach ($alert_on as $alert) {
@@ -204,10 +214,10 @@ function getHashofTable($con, $table, $salt, $alert_on=null) {
             }
             if (count($found_alert_arr) > 0) {
                 $alert_string = ":" . implode(",", $found_alert_arr);
-            }
+            } 
         }
 
-        $stringMash[$the_count][0] = $stringMash[$the_count][0] . ":" . hash( 'sha1', $imploded_columns) . $alert_string;
+        $stringMash[$the_count][0] = $stringMash[$the_count][0] . ":" . hash( 'sha1', $imploded_columns) . $alert_string . $extracted_field;
         
         //debug only
         //print $table . " row: " . $stringMash[$the_count][0] . ":" . implode("<|split|>", $columns) . "\n";

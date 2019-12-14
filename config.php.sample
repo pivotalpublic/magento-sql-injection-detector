@@ -2,8 +2,8 @@
 
     //Ensure the permissions on this file are correct
     $client_name = "CLIENT NAME";
-    $chat_ids = ""; //XXXXXXXXX
-    $telegram_token = ""; //XXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    $chat_ids = ""; //XXXXXXXXX,XXXXXXXXX (accepts a single or many delimited with commas)
+    $telegram_token = ""; //XXXXXXXXX:XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX //Get this from the Bot father
     $salt = "[pi>otal]"; //Anything you want, but something to prevent a reverse engineering
     $mage_directory = __DIR__ . "/../htdocs"; ///../htdocs (In relation to detector.php)
 
