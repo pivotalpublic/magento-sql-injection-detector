@@ -52,9 +52,9 @@ if (!$con) {
         print "Nothing to compare yet...\n";
     }
 
-    $cms_page = getHashofTable($con, "cms_page", $salt, $alert_on);
-    $cms_block = getHashofTable($con, "cms_block", $salt, $alert_on);
-    $core_config_data = getHashofTable($con, "core_config_data", $salt, $alert_on);
+    $cms_page = getHashofTable($con, "cms_page", $salt, $alert_on, 5); //1 = identifier
+    $cms_block = getHashofTable($con, "cms_block", $salt, $alert_on, 2); //2 = identifier
+    $core_config_data = getHashofTable($con, "core_config_data", $salt, $alert_on, 3); //3 = path
     $admin_user = getHashofTable($con, "admin_user", $salt, null, 4); //4 = username
     
     $results = [];
