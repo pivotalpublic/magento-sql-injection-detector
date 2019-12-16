@@ -11,6 +11,7 @@ Tables to check: cms_page, cms_block, core_config_data, admin_user
 */
 
 include 'config.php';
+include 'feed-digest.php';
 
 //Often found after sqlinjection
 $alert_on = Array("getscript", "ajax.request", ".js");
@@ -58,6 +59,7 @@ if (!$con) {
     $admin_user = getHashofTable($con, "admin_user", $salt, null, 4); //4 = username
     
     $results = [];
+    $results["patch_version"] = $patched;
     $results["cms_page"] = $cms_page;
     $results["cms_block"] = $cms_block;
     $results["core_config_data"] = $core_config_data;
@@ -125,6 +127,21 @@ if (!$con) {
 
 function plainTextDifferences($arr) {
     $plain_text = "";
+
+    $patched = $arr['patch_version'];
+    $patched_data = explode(":", $patched);
+
+// print_r($patched_data[1]);
+// die();
+
+    if ($patched_data[1] != "true") {
+        $plain_text .= "Magento " . $patched_data[1] . " is not installed. Please upgrade.\n\n";
+    } else {
+        $plain_text .= "Latest Magento patches are installed. Good work!\n\n"; 
+    }
+    
+    array_shift($arr);
+
     foreach ($arr as $table_name => $table_contents) {
         $plain_text .= "Table " . $table_name . "\n";
         foreach ($table_contents as $table_content) {

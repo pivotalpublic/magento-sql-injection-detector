@@ -7,4 +7,8 @@
     $salt = "[pi>otal]"; //Anything you want, but something to prevent a reverse engineering
     $mage_directory = __DIR__ . "/../htdocs"; ///../htdocs (In relation to detector.php)
 
+    //Github access details
+    $github_username = 'XXXXXXXXX';
+    $github_password = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+
 ?>
