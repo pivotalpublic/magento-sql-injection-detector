@@ -13,8 +13,12 @@ Tables to check: cms_page, cms_block, core_config_data, admin_user
 include 'config.php';
 include 'feed-digest.php';
 
+$todays_date = date('Y-m-d H:i:s');
+$todays_date_file = date('Ymd');
+$log_file = __DIR__ . "/pulse-" . $todays_date_file . ".log";
+
 //Often found after sqlinjection
-$alert_on = Array("getscript", "ajax.request", ".js");
+$alert_on = Array("getscript", "ajax.request", ".js\"", ".js'", "<script");
 
 $hashes_file = __DIR__ . "/detector.json";
 $magento_vars = fetchArray($mage_directory . "/app/etc/env.php");
@@ -24,18 +28,13 @@ $dbname = $magento_vars["db"]["connection"]["default"]["dbname"];
 $username = $magento_vars["db"]["connection"]["default"]["username"];
 $password = $magento_vars["db"]["connection"]["default"]["password"];
 
-print "\nPivotal Table Change Detector";
+print "\nPivotal Pulse Report";
 print "\n=============================\n";
 
 print "Directory: " . __DIR__ . "\n";
 
-// print "Host: " . $host . "\n";
-// print "Database Name: " . $dbname . "\n";
-// print "Username: " . $username . "\n";
-// print "Password: " . $password . "\n";
-
 $con = mysqli_connect($host, $username, $password, $dbname);
-// Check connection
+
 if (!$con) {
 
     die("Connection failed: " . mysqli_connect_error());
@@ -65,21 +64,8 @@ if (!$con) {
     $results["core_config_data"] = $core_config_data;
     $results["admin_user"] = $admin_user;
     $json_string = json_encode($results);
-    //file_put_contents($hashes_file, $json_string);
-
-    // print "json_string Output:\n";
-    // print_r($results);
-    // print "\n\n";
-
-    // print "previous_json Output:\n";
-    // print_r($previous_json);
-    // print "\n\n";
-
-
-    // $difference = array_diff_assoc($results, $previous_json);
 
     $difference = arrayRecursiveDiff($results, $previous_json);
-
     $count_differences = count($difference);
 
     print "There are $count_differences different tables...\n";
@@ -93,75 +79,98 @@ if (!$con) {
     }
 
     if ($count_differences > 0) {
-        // $the_keys = array_keys($difference);
-        // $keys_string = implode(",", $the_keys);
-        $message = "$client_name Table Change\n";
+
+        $message = "$todays_date\n";
+        $message .= "$client_name Pulse Report\n";
         $message .= "========================\n";
-        $message .= $plain_text_message . "\n";
+        $message .= $plain_text_message[1] . "\n";
+
+        $log_message = "$todays_date\n";
+        $log_message .= "$client_name Pulse Report Log\n";
+        $log_message .= "========================\n";
+        $log_message .= $plain_text_message[0] . "\n";
+
         print "\n";
         print "Plain Text...\n";
-        print plainTextDifferences($difference);
+        print $plain_text_message[1];
         print "\n";
         print "Array Structure...\n";
         print $the_differences;
         print "\n";
         print "\n";
-        //print $message;
 
-        //$chat_id_arr = explode(",", $chat_id);
-        //foreach($chat_id_arr as $chat_id) {
-            sendMessage($chat_ids, $message, $telegram_token);
-            print "\n";
-        //}
+        sendMessage($chat_ids, $message, $telegram_token);
+        $log_file = file_put_contents($log_file, $log_message . PHP_EOL, FILE_APPEND | LOCK_EX);
+        
+        print "\n";
 
         //Update new hashes after sending message. Comment out while debugging to keep getting same results.
         file_put_contents($hashes_file, $json_string);
     } else {
         print "No change since last check...\n";
         print "\n";
-        //sendMessage($chat_ids, "Nothing changed on the " . $client_name . " website...", $telegram_token);
     }
 
     $con->close();
 }
 
-function plainTextDifferences($arr) {
+function plainTextDifferences($arr) 
+{
+    $log_text = "";
     $plain_text = "";
 
-    $patched = $arr['patch_version'];
-    $patched_data = explode(":", $patched);
-
-// print_r($patched_data[1]);
-// die();
-
-    if ($patched_data[1] != "true") {
-        $plain_text .= "Magento " . $patched_data[1] . " is not installed. Please upgrade.\n\n";
-    } else {
-        $plain_text .= "Latest Magento patches are installed. Good work!\n\n"; 
-    }
+    if (isset($arr['patch_version'])) {
     
-    array_shift($arr);
+    	$patched = $arr['patch_version'];
+        $patched_data = explode(";", $patched);
+
+        if ($patched_data[1] != "true") {
+            $plain_text .= "⁉️ Magento " . $patched_data[1] . " is not installed. Please upgrade.\n\n";
+            $log_text .= "⁉️ Magento " . $patched_data[1] . " is not installed. Please upgrade.\n\n";
+        } 
+
+        $admin_user = $arr['admin_user'];
+        $admin_user_data = explode(";", $admin_user);
+
+        array_shift($arr);
+
+    }
 
     foreach ($arr as $table_name => $table_contents) {
-        $plain_text .= "Table " . $table_name . "\n";
-        foreach ($table_contents as $table_content) {
-            $row_data = explode(":", $table_content[0]);
-            $plain_text .= "ID: " . $row_data[0];
-            //if ($found = $row_data[2]) {
+        if ($table_name != "admin_user") {
+            $plain_text .= "\n";
+            $plain_text .= "Table: " . $table_name . "\n";
+            foreach ($table_contents as $table_content) {
+                $row_data = explode(";", $table_content[0]);
+                $plain_text .= "ID: " . $row_data[0] . "\n";
                 if ($field_checked = $row_data[3]) {
-                    $field_string = " - " . $field_checked;
+                    $field_string = "\nIN: " . $field_checked;
                 }
-                $plain_text .= " detected " . $row_data[2] . $field_string . "\n";
-            //} else {
-                //$plain_text .= "\n";
-            //}
-        }
-        $plain_text .= "\n";
+                $plain_text .= "🛑 DANGEROUS SCRIPT: " . $row_data[2] . $field_string . "\n\n";
+            }
+        } 
     }
-    return $plain_text;
+
+    foreach ($arr as $table_name => $table_contents) {
+        $log_text .= "\n";
+        $log_text .= "Table: " . $table_name . "\n";
+        foreach ($table_contents as $table_content) {
+            $row_data = explode(";", $table_content[0]);
+            $log_text .= "ID: " . $row_data[0] . "\n";
+            if ($field_checked = $row_data[3]) {
+                $field_string = "\nIN: " . $field_checked;
+            }
+            $log_text .= "🛑 DANGEROUS SCRIPT: " . $row_data[2] . $field_string . "\n\n";
+        }
+    }
+
+    $return_arr = array($log_text, $plain_text);
+    return $return_arr;
+
 }
 
-function arrayRecursiveDiff($aArray1, $aArray2) {
+function arrayRecursiveDiff($aArray1, $aArray2) 
+{
     $aReturn = array();
 
     foreach ($aArray1 as $mKey => $mValue) {
@@ -196,8 +205,8 @@ function fetchArray($in)
   }
 }
 
-function getHashofTable($con, $table, $salt, $alert_on = null, $extract_field = null) {
-
+function getHashofTable($con, $table, $salt, $alert_on = null, $extract_field = null) 
+{
     $query = "SELECT * FROM " . $table . ";";
     $result = $con->query($query);
 
@@ -211,7 +220,7 @@ function getHashofTable($con, $table, $salt, $alert_on = null, $extract_field = 
         //Get extracted field if requested
         $extracted_field = "";
         if ($extract_field) {
-            $extracted_field = ":" . $columns[$extract_field];
+            $extracted_field = ";" . $columns[$extract_field];
         }
 
         //Get unique hash for each row
@@ -219,41 +228,33 @@ function getHashofTable($con, $table, $salt, $alert_on = null, $extract_field = 
         $imploded_columns = implode($salt, $columns);
 
         //Check for things to alert on
-        $alert_string = ":change";
+        $alert_string = ";change";
         $found_alert_arr = [];
         if ($alert_on) {
             foreach ($alert_on as $alert) {
                 if (strpos(strtolower($imploded_columns), strtolower($alert)) !== false) {
                     $found_alert_arr[] = $alert;
-                    print "Found $alert in $table: " . $stringMash[$the_count][0] . "\n";
+                    print "\n :stop_sign: Found $alert in $table: " . $stringMash[$the_count][0] . "\n";
                     print "\n";
                 }
             }
             if (count($found_alert_arr) > 0) {
-                $alert_string = ":" . implode(",", $found_alert_arr);
+                $alert_string = ";" . implode(",", $found_alert_arr);
             } 
         }
 
-        $stringMash[$the_count][0] = $stringMash[$the_count][0] . ":" . hash( 'sha1', $imploded_columns) . $alert_string . $extracted_field;
-        
-        //debug only
-        //print $table . " row: " . $stringMash[$the_count][0] . ":" . implode("<|split|>", $columns) . "\n";
+        $stringMash[$the_count][0] = $stringMash[$the_count][0] . ";" . hash( 'sha1', $imploded_columns) . $alert_string . $extracted_field;
 
         $the_count++;
 
     }
 
-    //prettier when debugging
-    // print "\n";
-    // print "\n";
-
-    // print_r($stringMash);
     return $stringMash;
 
 }
 
-function sendMessage($chatIDs, $messaggio, $token) {
-
+function sendMessage($chatIDs, $messaggio, $token) 
+{
     $chat_id_arr = explode(",", $chatIDs);
     foreach ($chat_id_arr as $chatID) {
 
