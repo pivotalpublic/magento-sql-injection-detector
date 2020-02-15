@@ -80,15 +80,19 @@ if (!$con) {
 
     if ($count_differences > 0) {
 
-        $message = "$todays_date\n";
-        $message .= "$client_name Pulse Report\n";
-        $message .= "========================\n";
-        $message .= $plain_text_message[1] . "\n";
+        if ($plain_text_message[1] != "") {
+            $message = "$todays_date\n";
+            $message .= "$client_name Pulse Report\n";
+            $message .= "========================\n";
+            $message .= $plain_text_message[1] . "\n";
+        }
 
-        $log_message = "$todays_date\n";
-        $log_message .= "$client_name Pulse Report Log\n";
-        $log_message .= "========================\n";
-        $log_message .= $plain_text_message[0] . "\n";
+        if ($plain_text_message[0] != "") {
+            $log_message = "$todays_date\n";
+            $log_message .= "$client_name Pulse Report Log\n";
+            $log_message .= "========================\n";
+            $log_message .= $plain_text_message[0] . "\n";
+        }
 
         print "\n";
         print "Plain Text...\n";
@@ -99,13 +103,25 @@ if (!$con) {
         print "\n";
         print "\n";
 
-        sendMessage($chat_ids, $message, $telegram_token);
-        $log_file = file_put_contents($log_file, $log_message . PHP_EOL, FILE_APPEND | LOCK_EX);
+        if ($plain_text_message[1] != "") {
+            sendMessage($chat_ids, $message, $telegram_token);
+    
+        }
         
+        
+        if ($plain_text_message[0] != "") {
+            $log_file = file_put_contents($log_file, $log_message . PHP_EOL, FILE_APPEND | LOCK_EX);
+        }
+
         print "\n";
 
+        
         //Update new hashes after sending message. Comment out while debugging to keep getting same results.
         file_put_contents($hashes_file, $json_string);
+        
+
+        //var_dump($plain_text_message);
+
     } else {
         print "No change since last check...\n";
         print "\n";
@@ -125,8 +141,8 @@ function plainTextDifferences($arr)
         $patched_data = explode(";", $patched);
 
         if ($patched_data[1] != "true") {
-            $plain_text .= "⁉️ Magento " . $patched_data[1] . " is not installed. Please upgrade.\n\n";
-            $log_text .= "⁉️ Magento " . $patched_data[1] . " is not installed. Please upgrade.\n\n";
+            $plain_text .= "⁉️ Magento " . $patched_data[1] . " is not installed. Please upgrade.\n";
+            $log_text .= "⁉️ Magento " . $patched_data[1] . " is not installed. Please upgrade.\n";
         } 
 
         $admin_user = $arr['admin_user'];
@@ -136,6 +152,7 @@ function plainTextDifferences($arr)
 
     }
 
+    $plain_text_reset = true;
     foreach ($arr as $table_name => $table_contents) {
         if ($table_name != "admin_user") {
             $plain_text .= "\n";
@@ -146,11 +163,19 @@ function plainTextDifferences($arr)
                 if ($field_checked = $row_data[3]) {
                     $field_string = "\nIN: " . $field_checked;
                 }
-                $plain_text .= "🛑 DANGEROUS SCRIPT: " . $row_data[2] . $field_string . "\n\n";
+                if ($row_data[2] != "change") {
+                    $plain_text .= "🛑 DANGEROUS SCRIPT: " . $row_data[2] . $field_string . "\n\n";
+                    $plain_text_reset = false;
+                }
             }
         } 
     }
 
+    if ($plain_text_reset == true) {
+        $plain_text = "";
+    }
+
+    $log_text_reset = true;
     foreach ($arr as $table_name => $table_contents) {
         $log_text .= "\n";
         $log_text .= "Table: " . $table_name . "\n";
@@ -160,9 +185,23 @@ function plainTextDifferences($arr)
             if ($field_checked = $row_data[3]) {
                 $field_string = "\nIN: " . $field_checked;
             }
-            $log_text .= "🛑 DANGEROUS SCRIPT: " . $row_data[2] . $field_string . "\n\n";
+            if ($row_data[2] != "change") {
+                $log_text .= "🛑 DANGEROUS SCRIPT: " . $row_data[2] . $field_string . "\n\n";
+                $log_text_reset = false;
+            } else {
+                $log_text .= "Activity: " . $row_data[2] . $field_string . "\n\n";
+                $log_text_reset = false;
+            }
         }
     }
+
+    // print "[[[" . $log_text . "]]]\n";
+
+    if ($log_text_reset == true) {
+        $log_text = "";
+    }
+
+    print "[[[" . $log_text . "]]]\n";
 
     $return_arr = array($log_text, $plain_text);
     return $return_arr;
